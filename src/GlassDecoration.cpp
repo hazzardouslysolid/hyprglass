@@ -666,7 +666,7 @@ void CGlassDecoration::renderPass(Render::CRenderContext& ctx, PHLMONITOR monito
     }
 
     GlassRenderer::applyGlassEffect(ctx, m_sampleFramebuffer, source,
-                                     windowBox, transformBox, glassAlpha,
+                                     windowBox, glassAlpha,
                                      std::array<float, 4>{cornerRadius, cornerRadius, cornerRadius, cornerRadius},
                                      roundingPower, m_samplePaddingRatio, resolveContext, nullptr, focusLight,
                                      frostInput.copy ? &frostInput : nullptr);

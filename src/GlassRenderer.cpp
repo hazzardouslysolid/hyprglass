@@ -454,7 +454,7 @@ static constexpr int CONTOUR_TEXTURE_UNIT = 3; // layers only, so never at the s
 
 void applyGlassEffect(Render::CRenderContext& ctx,
                        SP<Render::IFramebuffer> sampleFramebuffer, SP<Render::IFramebuffer> targetFramebuffer,
-                       CBox& rawBox, CBox& transformedBox,
+                       CBox& rawBox,
                        float alpha, const std::array<float, 4>& radii, float roundingPower,
                        const Vector2D& paddingRatio, const SResolveContext& resolveContext,
                        const SMaskInfo* mask, float focusLight, const SFrostInput* frost) {
@@ -519,7 +519,7 @@ void applyGlassEffect(Render::CRenderContext& ctx,
     shader->setUniformMatrix3fv(SHADER_PROJ, 1, GL_FALSE, glMatrix.getMatrix());
     shader->setUniformInt(SHADER_TEX, 0);
 
-    const auto fullSize = Vector2D(transformedBox.width, transformedBox.height);
+    const auto fullSize = Vector2D(rawBox.width, rawBox.height);
     shader->setUniformFloat2(SHADER_FULL_SIZE,
         static_cast<float>(fullSize.x), static_cast<float>(fullSize.y));
 
@@ -693,6 +693,9 @@ void applyGlassEffect(Render::CRenderContext& ctx,
     // subset of) already covers every pixel we're visible at, so scissoring to the damage
     // clips no pixel that would otherwise reach the screen.
     CBox damageExtents = ctx.m_data.damage.copy().intersect(rawBox).getExtents();
+    // transformDamage is false throughout the scene pass (the work buffer is
+    // monitor-oriented) and only true for the final output blit, matching
+    // Hyprland's own scissor convention.
     g_pHyprOpenGL->scissor(ctx, damageExtents.w > 0 && damageExtents.h > 0 ? damageExtents : rawBox, ctx.m_data.transformDamage);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     g_pHyprOpenGL->scissor(ctx, nullptr);

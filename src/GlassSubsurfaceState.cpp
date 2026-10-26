@@ -282,7 +282,7 @@ void CGlassSubsurfaceState::compositeAndRestore(Render::CRenderContext& ctx, PHL
             hintPixelBox.w > 0.0 && hintPixelBox.h > 0.0) {
             radii = {static_cast<float>(hints->radii[0]) * scale, static_cast<float>(hints->radii[1]) * scale,
                      static_cast<float>(hints->radii[2]) * scale, static_cast<float>(hints->radii[3]) * scale};
-            // Clamped against the hint's own (pre-transform) box — the pairing
+            // Clamped against the hint's own (monitor-oriented) box — the pairing
             // radii[0]+radii[1] means "top edge" in the client's own frame,
             // in the same monitor-oriented space as the shader.
             clampRadiiToBox(radii, static_cast<float>(hintPixelBox.w), static_cast<float>(hintPixelBox.h));
@@ -352,11 +352,10 @@ void CGlassSubsurfaceState::compositeAndRestore(Render::CRenderContext& ctx, PHL
     maskInfo.sampleUVOffset = Vector2D(0.0, 0.0);
     maskInfo.sampleUVScale  = Vector2D(1.0, 1.0);
 
-    CBox mutableRawBox       = rawBox;
-    CBox mutableTransformBox = transformBox;
+    CBox mutableRawBox = rawBox;
     GlassRenderer::applyGlassEffect(ctx,
                                      m_sampleFramebuffer, target,
-                                     mutableRawBox, mutableTransformBox, alpha,
+                                     mutableRawBox, alpha,
                                      radii, roundingPower, m_samplePaddingRatio, resolveContext,
                                      &maskInfo);
 

@@ -201,9 +201,11 @@ struct SFrostInput {
 // its fade). Only the active window's glass passes one above 0.
 //
 // frost: windows only, null when the glass is not frosted right now (see SFrostInput).
+// rawBox is in monitor-oriented work-buffer pixels; Hyprland applies output
+// rotation/mirroring later, when the finished scene is copied to the output.
 void applyGlassEffect(Render::CRenderContext& ctx,
                        SP<Render::IFramebuffer> sampleFramebuffer, SP<Render::IFramebuffer> targetFramebuffer,
-                       CBox& rawBox, CBox& transformedBox,
+                       CBox& rawBox,
                        float alpha, const std::array<float, 4>& radii, float roundingPower,
                        const Vector2D& paddingRatio, const SResolveContext& resolveContext,
                        const SMaskInfo* mask = nullptr, float focusLight = 0.0f, const SFrostInput* frost = nullptr);
