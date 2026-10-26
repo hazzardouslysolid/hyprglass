@@ -61,8 +61,7 @@ SSampleMap sampleMapFor(const CBox& box, int downscale) {
     return map;
 }
 
-bool damageCoversBox(const CBox& box, const SP<Render::IFramebuffer>& framebuffer, const CRegion& damage,
-                     const PHLMONITOR& monitor) {
+bool damageCoversBox(const CBox& box, const SP<Render::IFramebuffer>& framebuffer, const CRegion& damage) {
     if (!framebuffer)
         return false;
 
@@ -75,23 +74,17 @@ bool damageCoversBox(const CBox& box, const SP<Render::IFramebuffer>& framebuffe
     if (x2 <= x1 || y2 <= y1)
         return true;
 
-    // Render damage is in the rotated monitor space while the box is in unrotated
-    // framebuffer pixels: transform it like Hyprland does for the output damage.
-    CRegion framebufferDamage = damage.copy();
-    if (monitor)
-        framebufferDamage.transform(Math::wlTransformToHyprutils(Math::invertTransform(monitor->m_transform)),
-                                    monitor->m_transformedSize.x, monitor->m_transformedSize.y);
-
-    return CRegion(CBox{x1, y1, x2 - x1, y2 - y1}).subtract(framebufferDamage).empty();
+    // The work buffer and render damage are both monitor-oriented. Rotating
+    // damage here would test a different region on transformed outputs (#99).
+    return CRegion(CBox{x1, y1, x2 - x1, y2 - y1}).subtract(damage).empty();
 }
 
-bool sampleRegionCovered(const CBox& box, const SP<Render::IFramebuffer>& source, const CRegion& damage,
-                         const PHLMONITOR& monitor) {
+bool sampleRegionCovered(const CBox& box, const SP<Render::IFramebuffer>& source, const CRegion& damage) {
     // The exact source rect the blit reads.
     const auto map = sampleMapFor(box, 1);
     return damageCoversBox(CBox{static_cast<double>(map.srcX0), static_cast<double>(map.srcY0), static_cast<double>(map.srcX1 - map.srcX0),
                                 static_cast<double>(map.srcY1 - map.srcY0)},
-                           source, damage, monitor);
+                           source, damage);
 }
 
 SFoldedBlur foldBlurPasses(float radius, int iterations) noexcept {
@@ -196,12 +189,6 @@ void sampleBackground(Render::CRenderContext& ctx, SP<Render::IFramebuffer>& sam
 void blendOwnContent(Render::CRenderContext& ctx, SP<Render::IFramebuffer>& sampleFramebuffer, PHLWINDOW window,
                       PHLMONITOR monitor, const CBox& box, int downscale, float amount, float cornerRadius, float roundingPower) {
     if (amount <= 0.0f || !sampleFramebuffer || !window || !monitor)
-        return;
-
-    // The sample framebuffer holds already-rotated framebuffer-space pixels, while a
-    // texture drawn under RPT_EXPORT lands axis-aligned: on a 90/270 output the self
-    // image would come out rotated. Skipping keeps those outputs at today's look.
-    if (monitor->m_transform != WL_OUTPUT_TRANSFORM_NORMAL)
         return;
 
     // Hyprland renders a transformed window through a redirected pass and blits the
@@ -395,9 +382,7 @@ void blurBackground(Render::CRenderContext& ctx, SP<Render::IFramebuffer> sample
     }
 
     // Restore caller's GL state without querying (avoids pipeline stalls).
-    // The viewport must match the re-bound framebuffer's own size: monitor
-    // sizes are wrong here on 90°/270° monitors, where m_transformedSize is
-    // swapped relative to the framebuffer's native orientation (#41).
+    // The viewport must match the re-bound framebuffer, including redirected targets.
     g_pHyprRenderer->blend(true); // Hyprland's state at every element boundary
     g_pHyprOpenGL->bindFramebuffer(GL_FRAMEBUFFER, fbId(callerFramebuffer));
     glBindVertexArray(0);
@@ -497,10 +482,9 @@ void applyGlassEffect(Render::CRenderContext& ctx,
     // A variant that failed to compile falls back to the default program: the layer then keeps its rectangle.
     const bool  contoured = wantsContour && (program.features & GLASS_FEATURE_CONTOUR);
 
-    const auto transform = Math::wlTransformToHyprutils(
-        Math::invertTransform(ctx.m_data.pMonitor->m_transform));
-
-    Mat3x3 glMatrix = g_pHyprRenderer->projectBoxToTarget(ctx, rawBox, transform);
+    // The scene framebuffer is already monitor-oriented. Let the context project
+    // the quad; an extra inverse output transform rotates its texture twice.
+    Mat3x3 glMatrix = g_pHyprRenderer->projectBoxToTarget(ctx, rawBox);
     auto texture    = sampleFramebuffer->getTexture();
 
     glMatrix.transpose();
@@ -709,7 +693,7 @@ void applyGlassEffect(Render::CRenderContext& ctx,
     // subset of) already covers every pixel we're visible at, so scissoring to the damage
     // clips no pixel that would otherwise reach the screen.
     CBox damageExtents = ctx.m_data.damage.copy().intersect(rawBox).getExtents();
-    g_pHyprOpenGL->scissor(ctx, damageExtents.w > 0 && damageExtents.h > 0 ? damageExtents : rawBox);
+    g_pHyprOpenGL->scissor(ctx, damageExtents.w > 0 && damageExtents.h > 0 ? damageExtents : rawBox, ctx.m_data.transformDamage);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     g_pHyprOpenGL->scissor(ctx, nullptr);
 }

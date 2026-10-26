@@ -17,12 +17,6 @@
 #include <hyprland/src/render/Renderer.hpp>
 #include <hyprutils/math/Misc.hpp>
 
-static CBox transformedLayerBox(CBox pixelBox, PHLMONITOR monitor) {
-    const auto transform = Math::wlTransformToHyprutils(Math::invertTransform(monitor->m_transform));
-    pixelBox.transform(transform, monitor->m_transformedSize.x, monitor->m_transformedSize.y).noNegativeSize().round();
-    return pixelBox;
-}
-
 CGlassLayerSurface::CGlassLayerSurface(PHLLS layerSurface)
     : m_layerSurface(layerSurface) {
 }
@@ -85,7 +79,7 @@ bool CGlassLayerSurface::xraySnapshotCovers(Render::CRenderContext& ctx, PHLMONI
 
     // The full layer box: sampleAndRedirect() samples it or the blur region
     // inside it, so covering it covers both.
-    return static_cast<bool>(xraySnapshotCovering(monitor, ctx.m_data.currentFB, transformedLayerBox(*layerBox, monitor)));
+    return static_cast<bool>(xraySnapshotCovering(monitor, ctx.m_data.currentFB, *layerBox));
 }
 
 std::string CGlassLayerSurface::resolvePresetName() const {
@@ -182,15 +176,13 @@ CRegion CGlassLayerSurface::transformedBlurRegion(PHLMONITOR monitor, const CBox
 
     const auto logicalSize = layerSurface->size(Desktop::View::IGeometric::GEOMETRIC_CURRENT);
 
-    // surface-local logical region -> box-local pixels, same
-    // scale/translate/transform sequence as transformedLayerBox()
+    // Surface-local logical region -> monitor-oriented work-buffer pixels.
+    // The output transform is applied later, to the completed scene.
     CRegion region = wlSurface->m_blurRegion.copy();
     region.intersect(0, 0, logicalSize.x, logicalSize.y); // spec: clipped to surface size
     region.scale(static_cast<float>(monitor->m_scale));
     region.translate(rawBox.pos());
     region.intersect(rawBox.x, rawBox.y, rawBox.w, rawBox.h); // defensive
-    region.transform(Math::wlTransformToHyprutils(Math::invertTransform(monitor->m_transform)),
-                      monitor->m_transformedSize.x, monitor->m_transformedSize.y);
     return region;
 }
 
@@ -356,7 +348,7 @@ void CGlassLayerSurface::sampleAndRedirect(Render::CRenderContext& ctx, PHLMONIT
     if (!layerBox)
         return;
 
-    CBox transformBox = transformedLayerBox(*layerBox, monitor);
+    CBox transformBox = *layerBox;
 
     // PROTOCOL_REGION: glass only ever shows inside the blur region, so blurred
     // data outside it is provably never sampled. m_cachedTransformedRegion is
@@ -404,7 +396,7 @@ void CGlassLayerSurface::sampleAndRedirect(Render::CRenderContext& ctx, PHLMONIT
     const auto snapshot      = (xray && backgroundChanged) ? xraySnapshotCovering(monitor, source, sampleBox) : nullptr;
     const bool sampleCovered = !backgroundChanged ||
                                (xray ? static_cast<bool>(snapshot) :
-                                       GlassRenderer::sampleRegionCovered(sampleBox, source, ctx.m_data.damage, monitor));
+                                       GlassRenderer::sampleRegionCovered(sampleBox, source, ctx.m_data.damage));
 
     if (!layerSurface->mapped()) {
         // During fade-out, re-sampling captures stale pixels. Reuse cached sample.
@@ -458,8 +450,7 @@ void CGlassLayerSurface::sampleAndRedirect(Render::CRenderContext& ctx, PHLMONIT
     // Redirect surface rendering to a temp FBO cleared to transparent.
     // The original renderLayer (called between pre/post elements) will render
     // the surface into this FBO. compositeAndRestore uses its alpha as a mask.
-    // Size from the source FB, not the monitor: m_transformedSize is swapped
-    // relative to the framebuffer's native orientation on 90°/270° monitors (#41).
+    // Match the source framebuffer, including any redirected target size.
     int monitorWidth  = static_cast<int>(source->m_size.x);
     int monitorHeight = static_cast<int>(source->m_size.y);
 
@@ -540,7 +531,7 @@ bool CGlassLayerSurface::attachContour(Render::CRenderContext& ctx, PHLMONITOR m
 
     if (m_contour.wantsBuild(key)) {
         // The temp FBO only holds what this frame redrew: a field needs all of the layer in it.
-        if (GlassRenderer::damageCoversBox(transformBox, target, ctx.m_data.damage, monitor)) {
+        if (GlassRenderer::damageCoversBox(transformBox, target, ctx.m_data.damage)) {
             if (!m_contour.build(ctx, key, m_surfaceTempFramebuffer, transformBox, alpha, target) && g_pGlobalState->contourUnavailable)
                 return false;
         } else if (m_contour.noteUncoveredFrame())
@@ -600,7 +591,7 @@ void CGlassLayerSurface::compositeAndRestore(Render::CRenderContext& ctx, PHLMON
         Diagnostics::recordLayerGlassDraw(monitor->m_id);
 
     CBox rawBox       = *layerBox;
-    CBox transformBox = transformedLayerBox(rawBox, monitor);
+    CBox transformBox = rawBox;
 
     const bool isDark                     = resolveThemeIsDark();
     const std::string preset              = resolvePresetName();
@@ -703,7 +694,7 @@ void CGlassLayerSurface::compositeAndRestore(Render::CRenderContext& ctx, PHLMON
             const float maxRadius = static_cast<float>(std::min(shapeBox.w, shapeBox.h)) / 2.0f;
             cornerRadius          = shape->radius < 0.0f ? maxRadius : std::min(shape->radius * static_cast<float>(scale), maxRadius);
 
-            const CBox transformedShapeBox = transformedLayerBox(shapeBox, monitor);
+            const CBox transformedShapeBox = shapeBox;
             maskInfo.glassBoxOffsetPx      = Vector2D(transformedShapeBox.x - transformBox.x, transformedShapeBox.y - transformBox.y);
             maskInfo.glassBoxSizePx        = Vector2D(transformedShapeBox.w, transformedShapeBox.h);
         }

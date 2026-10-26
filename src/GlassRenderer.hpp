@@ -148,17 +148,14 @@ struct SSampleMap {
 
 // True when every pixel of `box`, clipped to the framebuffer, lies inside `damage`: the
 // frame redraws all of it. The only coverage predicate; sampleRegionCovered() asks it for
-// the sample's source rectangle. `box` is in post-transform framebuffer pixels; `damage`
-// is in render space like the render context's damage, and is transformed by `monitor` to match
-// (a null monitor for a region already in framebuffer space, like the x-ray one).
-[[nodiscard]] bool damageCoversBox(const CBox& box, const SP<Render::IFramebuffer>& framebuffer, const CRegion& damage,
-                                   const PHLMONITOR& monitor);
+// the sample's source rectangle. Both `box` and `damage` are in monitor-oriented
+// work-buffer pixels, before the final output transform.
+[[nodiscard]] bool damageCoversBox(const CBox& box, const SP<Render::IFramebuffer>& framebuffer, const CRegion& damage);
 
 // True when every pixel sampleBackground() would read for `box` lies inside
-// `damage`. `box` is in post-transform framebuffer pixels, not the logical space
+// `damage`. `box` is in monitor-oriented framebuffer pixels, not the logical space
 // boundingBox() pads in; see damageCoversBox() for `damage`.
-[[nodiscard]] bool sampleRegionCovered(const CBox& box, const SP<Render::IFramebuffer>& source, const CRegion& damage,
-                                       const PHLMONITOR& monitor);
+[[nodiscard]] bool sampleRegionCovered(const CBox& box, const SP<Render::IFramebuffer>& source, const CRegion& damage);
 
 void sampleBackground(Render::CRenderContext& ctx, SP<Render::IFramebuffer>& sampleFramebuffer,
                        SP<Render::IFramebuffer> sourceFramebuffer, CBox box, Vector2D& outPaddingRatio, int downscale = 1);
@@ -171,7 +168,7 @@ void blendOwnContent(Render::CRenderContext& ctx, SP<Render::IFramebuffer>& samp
 
 // callerFramebuffer is re-bound after the blur ping-pong; the viewport is
 // restored from its size so it always matches the re-bound framebuffer
-// (monitor fields would be wrong on 90°/270° transformed monitors).
+// (which may differ from the monitor for redirected targets).
 // temporaryFramebuffer: the ping-pong target; null uses the one every glass shares. A caller blurring
 // at another size than the rest passes its own, so the shared one is not reallocated back and forth.
 void blurBackground(Render::CRenderContext& ctx, SP<Render::IFramebuffer> sampleFramebuffer, float radius,

@@ -129,7 +129,7 @@ void CGlassSubsurfaceState::sampleAndRedirect(Render::CRenderContext& ctx, PHLMO
     const bool backgroundChanged = !m_hasCachedSample || currentGeneration != m_lastSceneGeneration || movedOrResized;
 
     const bool sampleCovered = !backgroundChanged ||
-        GlassRenderer::sampleRegionCovered(transformBox, source, ctx.m_data.damage, monitor);
+        GlassRenderer::sampleRegionCovered(transformBox, source, ctx.m_data.damage);
 
     if (!sampleCovered) {
         // The work buffer is cleared outside this frame's damage: sampling now
@@ -284,10 +284,10 @@ void CGlassSubsurfaceState::compositeAndRestore(Render::CRenderContext& ctx, PHL
                      static_cast<float>(hints->radii[2]) * scale, static_cast<float>(hints->radii[3]) * scale};
             // Clamped against the hint's own (pre-transform) box — the pairing
             // radii[0]+radii[1] means "top edge" in the client's own frame,
-            // regardless of how the monitor transform later permutes the array.
+            // in the same monitor-oriented space as the shader.
             clampRadiiToBox(radii, static_cast<float>(hintPixelBox.w), static_cast<float>(hintPixelBox.h));
 
-            CBox transformedHintBox = WindowGeometry::applyMonitorTransform(hintPixelBox, monitor);
+            CBox transformedHintBox = hintPixelBox;
             transformedHintBox.noNegativeSize().round();
             maskInfo.glassBoxOffsetPx = Vector2D(transformedHintBox.x - transformBox.x, transformedHintBox.y - transformBox.y);
             maskInfo.glassBoxSizePx   = Vector2D(transformedHintBox.w, transformedHintBox.h);
@@ -296,7 +296,7 @@ void CGlassSubsurfaceState::compositeAndRestore(Render::CRenderContext& ctx, PHL
     } else if (hints && hints->shapeMode == eItemShapeMode::INHERIT_WINDOW) {
         if (const auto window = m_window.lock()) {
             if (const auto windowBox = WindowGeometry::computeWindowBox(window, monitor)) {
-                CBox transformedWindowBox = WindowGeometry::applyMonitorTransform(*windowBox, monitor);
+                CBox transformedWindowBox = *windowBox;
                 maskInfo.glassBoxOffsetPx = Vector2D(transformedWindowBox.x - transformBox.x, transformedWindowBox.y - transformBox.y);
                 maskInfo.glassBoxSizePx   = Vector2D(transformedWindowBox.w, transformedWindowBox.h);
                 haveGlassBox              = true;
@@ -329,9 +329,7 @@ void CGlassSubsurfaceState::compositeAndRestore(Render::CRenderContext& ctx, PHL
         // applyGlassEffect falls back to the whole box with every radius 0.
     }
 
-    // Monitor rotation/mirroring permutes which physical corner each array
-    // slot refers to. A no-op whenever all four radii are equal (NONE, INHERIT_WINDOW).
-    radii = SubsurfaceGeometry::permuteRadiiForMonitorTransform(radii, monitor);
+    // Radii retain surface corner order; output rotation happens after this draw.
 
     const auto rects = transformedRegion.getRects();
     if (rects.size() <= static_cast<size_t>(GlassRenderer::MAX_REGION_RECTS)) {

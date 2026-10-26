@@ -8,6 +8,9 @@
 
 namespace WindowGeometry {
 
+// Scene work buffers use monitor-oriented pixels. Output rotation/mirroring is
+// applied by Hyprland only when presenting the completed frame.
+
 [[nodiscard]] inline std::optional<CBox> computeWindowBox(PHLWINDOW window, PHLMONITOR monitor) {
     if (!window || !monitor)
         return std::nullopt;
@@ -47,19 +50,6 @@ namespace WindowGeometry {
     const float scale = monitor ? monitor->m_scale : 1.0f;
     box.expand(paddingPx / scale);
 
-    return box;
-}
-
-// The monitor transform CGlassDecoration::renderPass() applies to its own
-// transformBox, factored out so CGlassPassElement::needsLiveBlur() can apply
-// it identically to the box it evaluates wantsBackgroundResample() against —
-// the two must agree on 90/270-degree-rotated monitors.
-[[nodiscard]] inline CBox applyMonitorTransform(CBox box, PHLMONITOR monitor) {
-    if (!monitor)
-        return box;
-
-    const auto transform = Math::wlTransformToHyprutils(Math::invertTransform(monitor->m_transform));
-    box.transform(transform, monitor->m_transformedSize.x, monitor->m_transformedSize.y);
     return box;
 }
 

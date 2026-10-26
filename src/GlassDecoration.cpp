@@ -498,7 +498,7 @@ void CGlassDecoration::renderPass(Render::CRenderContext& ctx, PHLMONITOR monito
         Diagnostics::recordWindowGlassDraw(monitor->m_id);
 
     CBox windowBox    = *optBox;
-    CBox transformBox = WindowGeometry::applyMonitorTransform(windowBox, monitor);
+    CBox transformBox = windowBox;
 
     // Every non-discarded frame needs this regardless of cache hit/miss: a
     // cache-hit frame has no sampleBackground()/blurBackground() call for it
@@ -566,7 +566,7 @@ void CGlassDecoration::renderPass(Render::CRenderContext& ctx, PHLMONITOR monito
         // X-ray never samples the live frame: it holds the windows it hides.
         const auto snapshot = xray ? xraySnapshotCovering(monitor, source, transformBox) : nullptr;
         const bool covered  = xray ? static_cast<bool>(snapshot) :
-                                     GlassRenderer::sampleRegionCovered(transformBox, source, ctx.m_data.damage, monitor);
+                                     GlassRenderer::sampleRegionCovered(transformBox, source, ctx.m_data.damage);
 
         if (covered) {
             float blurStrength   = resolvePresetFloat(resolveContext, &SPresetValues::blurStrength, &SOverridableConfig::blurStrength);

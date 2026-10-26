@@ -676,7 +676,7 @@ static void hkRenderPassAdd(Render::CRenderPass* pass, UP<IPassElement>&& el) {
     }
 
     const CBox rawBox       = *pixelBox;
-    const CBox transformBox = SubsurfaceGeometry::toTransformBox(rawBox, monitor);
+    const CBox transformBox = rawBox;
     CRegion    region       = SubsurfaceGeometry::transformedItemBlurRegion(data.surface, rawBox, monitor);
     if (region.empty()) {
         // A background effect was declared but nothing is left to glass this

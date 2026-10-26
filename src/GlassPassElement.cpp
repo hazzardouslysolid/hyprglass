@@ -87,9 +87,9 @@ bool CGlassPassElement::needsLiveBlur(Render::CRenderContext& ctx) {
 
     // Only expand damage/exempt occlusion when the cached background actually
     // needs a fresh sample this frame — a cache hit needs neither (see the
-    // "Cache hit" case in renderPass()). Transformed like renderPass()'s own
-    // box so the two calls agree on 90/270-degree-rotated monitors too.
-    const CBox transformBox = WindowGeometry::applyMonitorTransform(*box, monitor);
+    // "Cache hit" case in renderPass()). Use the same monitor-oriented pixel
+    // box as renderPass(), including on rotated or mirrored outputs.
+    const CBox transformBox = *box;
     if (!m_data.decoration->wantsBackgroundResample(ctx, monitor, transformBox, m_data.xray))
         return false;
 
