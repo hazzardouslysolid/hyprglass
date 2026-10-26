@@ -63,12 +63,13 @@ class CGlassLayerSurface {
 
     [[nodiscard]] PHLLS getLayerSurface() const;
 
-    // PROTOCOL_REGION only: the blur region's bounding box in the same transformed
-    // monitor-pixel space as transformBox/regionRects (matches transformedBlurRegion()
-    // below). layerBox is the caller's already-computed LayerGeometry::computeLayerBox()
-    // result (both call sites have one in hand; avoids recomputing it here). Used to
-    // shrink the sample blit box, never the composite draw or boundingBox() (both stay
-    // full-layer — see GlassLayerSurface.cpp). Nullopt when the transformed region is empty.
+    // PROTOCOL_REGION only: the blur region's bounding box in the same
+    // monitor-oriented pixel space as transformBox/regionRects (matches
+    // transformedBlurRegion() below). layerBox is the caller's already-computed
+    // LayerGeometry::computeLayerBox() result (both call sites have one in hand;
+    // avoids recomputing it here). Used to shrink the sample blit box, never the
+    // composite draw or boundingBox() (both stay full-layer — see
+    // GlassLayerSurface.cpp). Nullopt when the region is empty.
     [[nodiscard]] std::optional<CBox> regionBoundingBoxAbsolute(PHLMONITOR monitor, const CBox& layerBox) const;
 
     // PROTOCOL_REGION only: the blur region's bounding box in global-logical
@@ -111,9 +112,15 @@ class CGlassLayerSurface {
     // surface content changed (e.g. clock tick) but the background didn't.
     uint64_t     m_lastSceneGeneration = 0;
 
+    // Monitor whose scene generation produced the cached sample. A layer surface
+    // can be re-assigned to another output, and generation counters are per
+    // monitor, so compare the id as well as the counter (same guard as
+    // CGlassDecoration::wantsBackgroundResample()).
+    MONITORID    m_lastGenerationMonitor = 0;
+
     // Transformed blur region computed by sampleAndRedirect() this frame
     // (PROTOCOL_REGION only, empty otherwise), reused by compositeAndRestore()'s
-    // regionRects mask upload so the scale/translate/transform sequence doesn't
+    // regionRects mask upload so the scale/translate sequence doesn't
     // run twice per frame. compositeAndRestore() recomputes via
     // transformedBlurRegion() as a defensive fallback if this is empty when it
     // shouldn't be (mask source disagreeing between the two calls in one frame).
@@ -135,7 +142,7 @@ class CGlassLayerSurface {
     std::optional<CBox> m_cachedRegionSampleBox;
 
     // Surface-local logical blur region intersected to the layer's own size,
-    // then scaled/translated/transformed into transformBox's pixel space —
+    // then scaled and translated into monitor-oriented pixel space —
     // shared by regionBoundingBoxAbsolute() and compositeAndRestore()'s
     // regionRects upload so both use identical, proven math.
     [[nodiscard]] CRegion transformedBlurRegion(PHLMONITOR monitor, const CBox& rawBox) const;

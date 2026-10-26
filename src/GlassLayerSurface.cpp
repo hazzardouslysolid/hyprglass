@@ -387,6 +387,7 @@ void CGlassLayerSurface::sampleAndRedirect(Render::CRenderContext& ctx, PHLMONIT
     const auto& config = g_pGlobalState->config;
     const bool forceLive = config.layersForceLiveResample && **config.layersForceLiveResample;
     const bool backgroundChanged = !m_hasCachedSample ||
+                                   monitor->m_id != m_lastGenerationMonitor ||
                                    currentGeneration != m_lastSceneGeneration ||
                                    isAnimating || m_backgroundDirty || forceLive || regionBoxChanged ||
                                    xray != m_cachedFromSnapshot;
@@ -441,6 +442,7 @@ void CGlassLayerSurface::sampleAndRedirect(Render::CRenderContext& ctx, PHLMONIT
         m_hasCachedSample      = true;
         m_cachedFromSnapshot   = xray;
         m_lastSceneGeneration  = currentGeneration;
+        m_lastGenerationMonitor = monitor->m_id;
         m_backgroundDirty      = false;
     } else {
         // background unchanged, reuse cached blur — skip 7 GPU operations
@@ -714,7 +716,7 @@ void CGlassLayerSurface::compositeAndRestore(Render::CRenderContext& ctx, PHLMON
     // in a single pass: glass behind, surface on top, using the temp FBO alpha.
     GlassRenderer::applyGlassEffect(ctx,
                                      m_sampleFramebuffer, target,
-                                     rawBox, transformBox, alpha,
+                                     rawBox, alpha,
                                      std::array<float, 4>{cornerRadius, cornerRadius, cornerRadius, cornerRadius},
                                      roundingPower, m_samplePaddingRatio, resolveContext,
                                      &maskInfo);
