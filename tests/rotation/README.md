@@ -59,3 +59,7 @@ checking their framebuffer/projection conventions.
 - Restore the user's monitor transform, effects, wallpaper and workspaces.
 
 Record which cases actually ran; do not treat this checklist as a test result.
+
+The results of the initial verification, the cases that were not covered and the
+pre-existing findings left out of this change are recorded in
+[FINDINGS.md](FINDINGS.md).
